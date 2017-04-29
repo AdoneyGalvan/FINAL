@@ -45,9 +45,9 @@ B6:     .word   316      # 144
 
     
 timer3_flag: .byte 0 
-note_time_count: .byte 0
-note_addresses: .byte 0
-time_addresses: .byte 0
+note_time_count: .word 0
+note_addresses: .word 0
+time_addresses: .word 0
     
 # StarWars
 # song_freqs: .byte 20, 0, 20, 0, 20, 0, 4, 0, 32, 0, 20, 0, 4, 0, 32, 0, 20, 0    
