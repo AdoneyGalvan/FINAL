@@ -101,8 +101,6 @@ MUSIC_MAIN:
     sw $ra, 0($sp)
     
     lw $t0, note_time_counter
-    li $t1, 100	# number of notes in song
-    sub $t0, $t0, $t1
     bnez $t0, loop
     
     # top of the song
@@ -113,7 +111,7 @@ MUSIC_MAIN:
 	la $s1, song_times # load first note duration
 	sw $s1, time_addresses
 	
-	li $s2, 0              # count to know when we have hit the end of our song
+	li $s2, 100 # number of notes in song
 	sw $s2, note_time_count
 
 	loop:
@@ -146,11 +144,8 @@ MUSIC_MAIN:
 
         # Increment note counter
 	lw $s2, note_counter
-        addi $s2, $s2, 1
+        addi $s2, $s2, -1
 	sw $s2, note_counter
-
-        # Set the amount of notes in the second arguement
-        beq $s2, 100, begin_song
 
         # Play the next note
 	lw $ra, 0($sp)
