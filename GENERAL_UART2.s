@@ -1,5 +1,5 @@
-.ifndef GENERAL_UART2
-    GENERAL_UART2:
+.ifndef UART2
+    UART2:
     .ent setup_UART2
 	setup_UART2:
 	ADDI $sp, $sp, -4
@@ -98,9 +98,6 @@
 	JR $ra
     .end send_byte_to_UART2
 .endif
-
-
-
 
 
 

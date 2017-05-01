@@ -95,8 +95,29 @@
 	ADDI $sp, $sp, 4
 	JR $ra
     .end send_char_arr_to_UART1
-.endif
+    
+    .ent send_byte_to_UART1
+    send_byte_to_UART1:
+    ADDI $sp, $sp, -4
+    SW $ra, 0($sp)
 
+    MOVE $t0, $a0
+
+    waittosendbyte1:
+    LW $t2, U1STA
+    ANDI $t2, $t2, 1 << 9
+    SRL $t2, $t2, 9
+    BEQZ $t2, endwaittosendbyte1
+    J waittosendbyte1
+
+    endwaittosendbyte1:
+    SB $t0, U1TXREG
+
+    LW $ra, 0($sp)
+    ADDI $sp, $sp, 4
+    JR $ra
+.end send_byte_to_UART1
+.endif
 
 
 
