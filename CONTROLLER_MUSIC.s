@@ -1,6 +1,8 @@
 .ifndef CONTROLLER_MUSIC
 CONTROLLER_MUSIC:
     
+.include "GENERAL_UART1.s"
+    
 .data
 notes:                   # Memory position in notes array
 No:	.word	0	 # 0
@@ -44,10 +46,7 @@ A6S:    .word   335      # 140
 B6:     .word   316      # 144
 
     
-timer3_flag: .byte 0 
-note_time_count: .word 0
-note_addresses: .word 0
-time_addresses: .word 0
+timer3_flag: .byte 0
     
 # StarWars
 # song_freqs: .byte 20, 0, 20, 0, 20, 0, 4, 0, 32, 0, 20, 0, 4, 0, 32, 0, 20, 0    
@@ -100,45 +99,53 @@ MUSIC_MAIN:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
     
-    lw $t0, note_time_count
-    bnez $t0, loop
+    # flags robot to start dancing
+    move $a0, $zero
+    jal send_byte_to_UART1
+    move $a0, $zero
+    jal send_byte_to_UART1
+    move $a0, $zero
+    jal send_byte_to_UART1
+    li $a0, 1
+    jal send_byte_to_UART1
     
     # top of the song
     begin_song:
-	la $s0, song_freqs # load first note
-	la $s1, song_times # load first note duration
-	li $s2, 100 # number of notes in song
+    la $s0, song_freqs # load first note
+    la $s1, song_times # load first note duration
+    li $s2, 100 # number of notes in song
 
-	loop:
-	la $s3, notes          # load table of notes
-        # Get the first note location in the note table
-        lb $t7, 0($s0)
-        add $t7, $t7, $s3
+    loop:
+    la $s3, notes          # load table of notes
+    # Get the first note location in the note table
+    lb $t7, 0($s0)
+    add $t7, $t7, $s3
 
-        # Get the actual note (PR value) from the note table
-        lw $a0, 0($t7)
+    # Get the actual note (PR value) from the note table
+    lw $a0, 0($t7)
 
-        # Get the note duration in 100ms
-        lb $a1, 0($s1)
+    # Get the note duration in 100ms
+    lb $a1, 0($s1)
 
-        # Play the note
-        jal play_note
+    # Play the note
+    jal play_note
 
-        # Wait for 100ms
-        li $a0, 1
-        jal delay_music
-	
-        # Increment all of our addresses to point to next note
-        addi $s0, $s0, 1
-        addi $s1, $s1, 1
+    # Wait for 100ms
+    li $a0, 1
+    jal delay
 
-        # Increment note counter
-        addi $s2, $s2, -1
+    # Increment all of our addresses to point to next note
+    addi $s0, $s0, 1
+    addi $s1, $s1, 1
 
-        # Play the next note
-	lw $ra, 0($sp)
-	addi $sp, $sp, 4
-        jr $ra
+    # Increment note counter
+    addi $s2, $s2, -1
+
+
+    # Play the next note
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
    
 .end MUSIC_MAIN
     
@@ -154,11 +161,11 @@ play_note:
     sw $a0, PR2
     # Set the duty cycle of our note to 50%
     srl $a0, $a0, 1
-    sw $a0, OC1RS
+    sw $a0, OC2RS
 
     # Wait for the note duration in 100ms increments
     move $a0, $a1
-    jal delay_music
+    jal delay
 
     # pop off stack
     lw $ra, 0 ($sp)
@@ -169,8 +176,8 @@ play_note:
     
 # counts for a certain number of ms
 # a0 = number of ms to loop
-.ent delay_music
-delay_music:
+.ent delay
+delay:
     
     # input number of ms to count
     move $t0, $a0
@@ -200,7 +207,7 @@ delay_music:
     sw $t0, IEC0CLR
     jr $ra
     
-.end delay_music
+.end delay
 
 # setup timer 2 as output compare base /64
 # setup timer 3 as a 100ms timer
@@ -244,28 +251,30 @@ setup_timers:
     jr $ra
 .end setup_timers
     
-# OC1 generates the PWM signals to make the notes
-.ent setup_output_compare1
-setup_output_compare1:
+# OC2 generates the PWM signals to make the notes
+.ent setup_output_compare2
+setup_output_compare2:
     
-    # clear OC1CON and set intital freq = 0
-    sw $zero, OC1CON
-    sw $zero, OC1R
-    sw $zero, OC1RS
+    # clear OC2CON and set intital freq = 0
+    sw $zero, OC2CON
+    sw $zero, OC2R
+    sw $zero, OC2RS
     
     li $t0, 6	# sets to PWM mode
-    ori $t0, $t0, 1 << 15   # enables OC1
-    sw $t0, OC1CONSET
+    ori $t0, $t0, 1 << 15   # enables OC2
+    sw $t0, OC2CONSET
     
     # timer 2 is base by default
     
     jr $ra
-.end setup_output_compare1
+.end setup_output_compare2
     
-# ***************************************
-# .SECTION INCLUDED IN MAIN_JOYSTICK_SEND
-# ***************************************
+# place timer3_ISR in vector table
+.section .vector_12, code
+j timer3_ISR
     
+.text
+
 # timer 3 interrupt handler
 .ent timer3_ISR
 timer3_ISR:
@@ -295,12 +304,11 @@ init_amp2:
     # Drive the initial amplifier signals
     # PORTD<8> = high for active state
     # PORTE<8> = high for 6 dB
-    li $t0, 1 << 8
+    li $t0, 0b101 << 7
     sw $t0, LATDSET
-    sw $t0, LATESET
     
     # PORTD<0> = clear analog out
-    li $t0, 1
+    li $t0, 0b10
     sw $t0, LATDCLR
    
     jr $ra
@@ -310,19 +318,21 @@ init_amp2:
 setup_pins:
     
     # setup PMW as out
-    li $t0, 1
+    li $t0, 0b10
     sw $t0, TRISDCLR
     
     # setup gain and shutdown as output
-    li $t0, 1 << 8
+    li $t0, 0b101 << 7 
     sw $t0, TRISDCLR
-    sw $t0, TRISECLR
     
     jr $ra
 .end setup_pins
     
 .endif
     
+    
+    
+ 
 
 
 
